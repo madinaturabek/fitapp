@@ -222,7 +222,7 @@ app.get('/workouts/:id', async (req, res) => {
   return res.json(map);
 });
 
-const port = Number(process.env.PORT || 8080);
+const port = Number(process.env.PORT || 3000);
 
 initDb()
   .then(() => {
