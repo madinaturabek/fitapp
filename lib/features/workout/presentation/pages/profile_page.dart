@@ -1,7 +1,11 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
+
+import '../../../../core/config/api_config.dart';
+import '../../../../core/localization/app_lang.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -11,13 +15,39 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  String _userName = 'Пользователь';
+  String _userName = 'Пайдаланушы';
   String _userEmail = 'user@example.com';
   int _totalWorkouts = 0;
   double _totalDistance = 0.0;
   int _totalCalories = 0;
   int _totalTime = 0;
   bool _isLoading = true;
+
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: const Color(0xFF00D9FF),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
+
+  String? _validatePassword(String password) {
+    if (password.length < 6) return tr('Кемінде 6 таңба', 'Минимум 6 символов');
+    if (!RegExp(r'[A-Z]').hasMatch(password)) {
+      return tr('Бас әріп керек', 'Нужна заглавная буква');
+    }
+    if (!RegExp(r'[a-z]').hasMatch(password)) {
+      return tr('Кіші әріп керек', 'Нужна строчная буква');
+    }
+    if (!RegExp(r'[0-9]').hasMatch(password)) return tr('Сан керек', 'Нужна цифра');
+    if (!RegExp(r'[^A-Za-z0-9]').hasMatch(password)) {
+      return tr('Арнайы таңба керек', 'Нужен спец. символ');
+    }
+    return null;
+  }
 
   @override
   void initState() {
@@ -30,13 +60,32 @@ class _ProfilePageState extends State<ProfilePage> {
       final prefs = await SharedPreferences.getInstance();
 
       setState(() {
-        _userName = prefs.getString('user_name') ?? 'Пользователь';
+        _userName = prefs.getString('user_name') ?? tr('Пайдаланушы', 'Пользователь');
         _userEmail = prefs.getString('user_email') ?? 'user@example.com';
       });
 
-      final String? jsonString = prefs.getString('workouts_history');
-      if (jsonString != null) {
-        final List<dynamic> workouts = json.decode(jsonString);
+      if (_userEmail.isNotEmpty && _userEmail != 'user@example.com') {
+        final userResp = await http.get(
+          Uri.parse('${ApiConfig.baseUrl}/users?email=$_userEmail'),
+        );
+        if (userResp.statusCode == 200) {
+          final data = json.decode(userResp.body);
+          final name = data['name']?.toString() ?? '';
+          if (name.isNotEmpty) {
+            await prefs.setString('user_name', name);
+            if (mounted) {
+              setState(() => _userName = name);
+            }
+          }
+        }
+      }
+
+      final response = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}/workouts?email=$_userEmail'),
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> workouts = json.decode(response.body);
 
         int totalWorkouts = workouts.length;
         double totalDistance = 0.0;
@@ -69,9 +118,11 @@ class _ProfilePageState extends State<ProfilePage> {
     final hours = seconds ~/ 3600;
     final minutes = (seconds % 3600) ~/ 60;
     if (hours > 0) {
-      return '${hours}ч ${minutes}м';
+      return appLang.value == 'ru'
+          ? '${hours}ч ${minutes}м'
+          : '${hours}сағ ${minutes}мин';
     }
-    return '${minutes}м';
+    return appLang.value == 'ru' ? '${minutes}м' : '${minutes}мин';
   }
 
   Future<void> _editProfile() async {
@@ -83,9 +134,9 @@ class _ProfilePageState extends State<ProfilePage> {
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF1C2130),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text(
-          'Редактировать профиль',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+        title: Text(
+          tr('Профильді өңдеу', 'Редактировать профиль'),
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -94,7 +145,7 @@ class _ProfilePageState extends State<ProfilePage> {
               controller: nameController,
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
-                labelText: 'Имя',
+                labelText: tr('Аты', 'Имя'),
                 labelStyle: const TextStyle(color: Colors.white54),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -128,9 +179,9 @@ class _ProfilePageState extends State<ProfilePage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text(
-              'Отмена',
-              style: TextStyle(color: Colors.white54, fontWeight: FontWeight.w600),
+            child: Text(
+              tr('Бас тарту', 'Отмена'),
+              style: const TextStyle(color: Colors.white54, fontWeight: FontWeight.w600),
             ),
           ),
           TextButton(
@@ -140,9 +191,9 @@ class _ProfilePageState extends State<ProfilePage> {
               await prefs.setString('user_email', emailController.text);
               Navigator.pop(context, true);
             },
-            child: const Text(
-              'Сохранить',
-              style: TextStyle(color: Color(0xFF00D9FF), fontWeight: FontWeight.w700),
+            child: Text(
+              tr('Сақтау', 'Сохранить'),
+              style: const TextStyle(color: Color(0xFF00D9FF), fontWeight: FontWeight.w700),
             ),
           ),
         ],
@@ -156,6 +207,152 @@ class _ProfilePageState extends State<ProfilePage> {
       });
       HapticFeedback.mediumImpact();
     }
+  }
+
+  Future<void> _changePassword() async {
+    final currentController = TextEditingController();
+    final newController = TextEditingController();
+    final confirmController = TextEditingController();
+    bool obscure = true;
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            backgroundColor: const Color(0xFF1C2130),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: Text(
+              tr('Құпиясөзді өзгерту', 'Изменить пароль'),
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: currentController,
+                  obscureText: obscure,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    labelText: tr('Қазіргі құпиясөз', 'Текущий пароль'),
+                    labelStyle: const TextStyle(color: Colors.white54),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        obscure ? Icons.visibility_off : Icons.visibility,
+                        color: Colors.white54,
+                      ),
+                      onPressed: () => setState(() => obscure = !obscure),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFF00D9FF)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFF00D9FF), width: 2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: newController,
+                  obscureText: obscure,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    labelText: tr('Жаңа құпиясөз', 'Новый пароль'),
+                    labelStyle: const TextStyle(color: Colors.white54),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFF00D9FF)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFF00D9FF), width: 2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: confirmController,
+                  obscureText: obscure,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    labelText: tr('Құпиясөзді растаңыз', 'Подтвердите пароль'),
+                    labelStyle: const TextStyle(color: Colors.white54),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFF00D9FF)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFF00D9FF), width: 2),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(tr('Бас тарту', 'Отмена'), style: const TextStyle(color: Colors.white54)),
+              ),
+              TextButton(
+                onPressed: () async {
+                  final current = currentController.text.trim();
+                  final next = newController.text.trim();
+                  final confirm = confirmController.text.trim();
+
+                  if (current.isEmpty || next.isEmpty || confirm.isEmpty) {
+                    _showMessage(tr('Барлық жолдарды толтырыңыз', 'Заполните все поля'));
+                    return;
+                  }
+                  if (next != confirm) {
+                    _showMessage(tr('Құпиясөздер сәйкес емес', 'Пароли не совпадают'));
+                    return;
+                  }
+                  final passError = _validatePassword(next);
+                  if (passError != null) {
+                    _showMessage(passError);
+                    return;
+                  }
+
+                  final prefs = await SharedPreferences.getInstance();
+                  final email = prefs.getString('user_email') ?? _userEmail;
+                  if (email.isEmpty || email == 'user@example.com') {
+                    _showMessage(tr('Пайдаланушы жоқ', 'Пользователь не найден'));
+                    return;
+                  }
+
+                  try {
+                    final response = await http.post(
+                      Uri.parse('${ApiConfig.baseUrl}/change_password'),
+                      headers: {'Content-Type': 'application/json'},
+                      body: jsonEncode({
+                        'email': email,
+                        'currentPassword': current,
+                        'newPassword': next,
+                      }),
+                    );
+                    if (response.statusCode == 200) {
+                      Navigator.pop(context);
+                      _showMessage(tr('Құпиясөз өзгертілді', 'Пароль изменён'));
+                    } else {
+                      _showMessage(response.body);
+                    }
+                  } catch (_) {
+                    _showMessage(tr('Серверге қосылу қатесі', 'Ошибка подключения к серверу'));
+                  }
+                },
+                child: Text(
+                  tr('Сақтау', 'Сохранить'),
+                  style: const TextStyle(color: Color(0xFF00D9FF), fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
   }
 
   @override
@@ -178,13 +375,25 @@ class _ProfilePageState extends State<ProfilePage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Профиль',
+              Text(
+                tr('Парақша', 'Профиль'),
                 style: TextStyle(
                   fontSize: 32,
                   fontWeight: FontWeight.w800,
                   color: Colors.white,
                 ),
+              ),
+
+              const SizedBox(height: 12),
+
+              Row(
+                children: [
+                  _buildLangChip('kk', 'Қазақша'),
+                  const SizedBox(width: 8),
+                  _buildLangChip('ru', 'Русский'),
+                  const Spacer(),
+                  _buildLogoutButton(),
+                ],
               ),
 
               const SizedBox(height: 32),
@@ -242,14 +451,14 @@ class _ProfilePageState extends State<ProfilePage> {
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(color: Colors.white, width: 1.5),
                         ),
-                        child: const Row(
+                        child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.edit_rounded, color: Colors.white, size: 16),
-                            SizedBox(width: 6),
+                            const Icon(Icons.edit_rounded, color: Colors.white, size: 16),
+                            const SizedBox(width: 6),
                             Text(
-                              'Редактировать',
-                              style: TextStyle(
+                              tr('Өңдеу', 'Редактировать'),
+                              style: const TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w700,
                                 color: Colors.white,
@@ -266,8 +475,8 @@ class _ProfilePageState extends State<ProfilePage> {
               const SizedBox(height: 32),
 
               // Статистика
-              const Text(
-                'Общая статистика',
+              Text(
+                tr('Жалпы статистика', 'Общая статистика'),
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
@@ -276,11 +485,49 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
               const SizedBox(height: 16),
 
+              GestureDetector(
+                onTap: _changePassword,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1C2130),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFF00D9FF).withOpacity(0.35), width: 1),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF00D9FF).withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.lock_rounded, color: Color(0xFF00D9FF), size: 20),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          tr('Құпиясөзді өзгерту', 'Изменить пароль'),
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                      Icon(Icons.chevron_right_rounded, color: Colors.white.withOpacity(0.4)),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
               Row(
                 children: [
                   Expanded(
                     child: _buildStatCard(
-                      'Тренировок',
+                      tr('Жаттығулар', 'Тренировок'),
                       '$_totalWorkouts',
                       Icons.fitness_center_rounded,
                       const Color(0xFF00D9FF),
@@ -289,7 +536,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: _buildStatCard(
-                      'Время',
+                      tr('Уақыт', 'Время'),
                       _formatTime(_totalTime),
                       Icons.timer_rounded,
                       const Color(0xFF7C3AED),
@@ -304,7 +551,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 children: [
                   Expanded(
                     child: _buildStatCard(
-                      'Дистанция',
+                      tr('Қашықтық', 'Дистанция'),
                       '${_totalDistance.toStringAsFixed(1)} км',
                       Icons.route_rounded,
                       const Color(0xFF10B981),
@@ -313,7 +560,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: _buildStatCard(
-                      'Калории',
+                      tr('Калория', 'Калории'),
                       '$_totalCalories',
                       Icons.local_fire_department_rounded,
                       const Color(0xFFFF6B35),
@@ -325,8 +572,8 @@ class _ProfilePageState extends State<ProfilePage> {
               const SizedBox(height: 32),
 
               // Приколюхи
-              const Text(
-                'Достижения',
+              Text(
+                tr('Жетістіктер', 'Достижения'),
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
@@ -336,29 +583,29 @@ class _ProfilePageState extends State<ProfilePage> {
               const SizedBox(height: 16),
 
               _buildAchievementCard(
-                '🔥 Огонёк',
-                'Тренировался 7 дней подряд',
+                tr('🔥 От', '🔥 Огонёк'),
+                tr('7 күн қатарынан жаттықты', 'Тренировался 7 дней подряд'),
                 Colors.orange,
                 isUnlocked: _totalWorkouts >= 7,
               ),
               const SizedBox(height: 12),
               _buildAchievementCard(
-                '⚡ Молния',
-                'Пробежал 10 км за раз',
+                tr('⚡ Найзағай', '⚡ Молния'),
+                tr('10 км бір рет жүгірді', 'Пробежал 10 км за раз'),
                 const Color(0xFFEAB308),
                 isUnlocked: false,
               ),
               const SizedBox(height: 12),
               _buildAchievementCard(
-                '💪 Качалка',
-                'Сжёг 1000 калорий',
+                tr('💪 Күш', '💪 Качалка'),
+                tr('1000 калория жақты', 'Сжёг 1000 калорий'),
                 const Color(0xFF10B981),
                 isUnlocked: _totalCalories >= 1000,
               ),
               const SizedBox(height: 12),
               _buildAchievementCard(
-                '🏆 Чемпион',
-                'Завершил 50 тренировок',
+                tr('🏆 Чемпион', '🏆 Чемпион'),
+                tr('50 жаттығу аяқтады', 'Завершил 50 тренировок'),
                 const Color(0xFF7C3AED),
                 isUnlocked: _totalWorkouts >= 50,
               ),
@@ -411,6 +658,60 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildLangChip(String lang, String label) {
+    final isSelected = appLang.value == lang;
+    return GestureDetector(
+      onTap: () async {
+        await setAppLang(lang);
+        setState(() {});
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF00D9FF) : const Color(0xFF1C2130),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? Colors.white : Colors.white70,
+            fontWeight: FontWeight.w600,
+            fontSize: 12,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLogoutButton() {
+    return GestureDetector(
+      onTap: () async {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('is_logged_in', false);
+        await prefs.remove('user_email');
+        await prefs.remove('user_name');
+        if (mounted) {
+          Navigator.pushReplacementNamed(context, '/login');
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1C2130),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Text(
+          tr('Шығу', 'Выйти'),
+          style: const TextStyle(
+            color: Color(0xFFFF6B35),
+            fontWeight: FontWeight.w700,
+            fontSize: 12,
+          ),
+        ),
       ),
     );
   }

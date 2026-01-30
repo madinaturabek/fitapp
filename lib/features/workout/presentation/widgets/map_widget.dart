@@ -7,11 +7,15 @@ import '../../domain/entities/route_point.dart';
 class MapWidget extends StatelessWidget {
   final List<RoutePoint> route;
   final bool followUser; // если true — центрируем на последней точке (простая логика)
+  final RoutePoint? currentPoint;
+  final String? headerText;
 
   const MapWidget({
     super.key,
     required this.route,
     this.followUser = true,
+    this.currentPoint,
+    this.headerText,
   });
 
   @override
@@ -26,6 +30,9 @@ class MapWidget extends StatelessWidget {
     // - если есть точки: последняя
     // - иначе: запасной центр (Москва)
     final center = points.isNotEmpty ? points.last : const LatLng(55.751244, 37.618423);
+    final markerPoint = currentPoint == null
+        ? null
+        : LatLng(currentPoint!.latitude, currentPoint!.longitude);
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(24),
@@ -63,27 +70,39 @@ class MapWidget extends StatelessWidget {
               ),
 
             // Маркеры старт/финиш
-            if (points.isNotEmpty)
+            if (points.isNotEmpty || markerPoint != null)
               MarkerLayer(
                 markers: [
-                  Marker(
-                    point: points.first,
-                    width: 36,
-                    height: 36,
-                    child: _Pin(
-                      color: Colors.green,
-                      icon: Icons.play_arrow_rounded,
+                  if (points.isNotEmpty)
+                    Marker(
+                      point: points.first,
+                      width: 36,
+                      height: 36,
+                      child: _Pin(
+                        color: Colors.green,
+                        icon: Icons.play_arrow_rounded,
+                      ),
                     ),
-                  ),
-                  Marker(
-                    point: points.last,
-                    width: 36,
-                    height: 36,
-                    child: _Pin(
-                      color: t.colorScheme.primary,
-                      icon: Icons.flag_rounded,
+                  if (points.isNotEmpty)
+                    Marker(
+                      point: points.last,
+                      width: 36,
+                      height: 36,
+                      child: _Pin(
+                        color: t.colorScheme.primary,
+                        icon: Icons.flag_rounded,
+                      ),
                     ),
-                  ),
+                  if (markerPoint != null)
+                    Marker(
+                      point: markerPoint,
+                      width: 36,
+                      height: 36,
+                      child: _Pin(
+                        color: const Color(0xFF00D9FF),
+                        icon: Icons.directions_run_rounded,
+                      ),
+                    ),
                 ],
               ),
 
@@ -105,7 +124,7 @@ class MapWidget extends StatelessWidget {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        points.isEmpty ? 'Ожидание GPS…' : 'Маршрут записывается',
+                        headerText ?? (points.isEmpty ? 'Ожидание GPS…' : 'Маршрут записывается'),
                         style: t.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800),
                       ),
                     ),

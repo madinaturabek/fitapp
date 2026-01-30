@@ -45,5 +45,22 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Нужно для записи маршрута тренировки.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Нужно для записи маршрута тренировки в фоне.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>Нужно для записи маршрута тренировки.</string>
+	<key>NSMotionUsageDescription</key>
+	<string>Нужно для подсчета шагов во время тренировки.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
 </dict>
 </plist>

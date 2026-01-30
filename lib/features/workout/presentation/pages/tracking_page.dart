@@ -1,9 +1,19 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:math' as math;
+import 'package:geolocator/geolocator.dart';
+import 'package:pedometer/pedometer.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:http/http.dart' as http;
+
+import '../../domain/entities/route_point.dart';
+import '../widgets/map_widget.dart';
+import '../../../../core/config/api_config.dart';
+import '../../../../core/localization/app_lang.dart';
 
 class TrackingPage extends StatefulWidget {
   const TrackingPage({super.key});
@@ -17,23 +27,25 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
   bool _isPaused = false;
   int _seconds = 0;
   Timer? _timer;
+  StreamSubscription<Position>? _positionSub;
+  StreamSubscription<StepCount>? _stepSub;
 
   double _distance = 0.0;
   int _calories = 0;
-  int _heartRate = 0;
   int _steps = 0;
   double _avgSpeed = 0.0;
   double _pace = 0.0;
   double _elevation = 0.0;
-  int _maxHeartRate = 0;
 
   String _workoutType = 'running';
 
-  final List<int> _heartRateHistory = [];
   final List<double> _speedHistory = [];
   final List<double> _elevationHistory = [];
-  int _totalHeartRate = 0;
-  int _heartRateCount = 0;
+
+  final List<RoutePoint> _route = [];
+  Position? _lastPosition;
+  int _startSteps = 0;
+  bool _hasStepBaseline = false;
 
   late AnimationController _pulseController;
   late AnimationController _rippleController;
@@ -64,95 +76,307 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
   @override
   void dispose() {
     _timer?.cancel();
+    _positionSub?.cancel();
+    _stepSub?.cancel();
     _pulseController.dispose();
     _rippleController.dispose();
     super.dispose();
   }
 
-  void _toggleWorkout() {
-    setState(() {
-      if (!_isActive) {
-        _isActive = true;
-        _isPaused = false;
-        _startTimer();
-      } else if (_isPaused) {
-        _isPaused = false;
-        _startTimer();
-      } else {
-        _isPaused = true;
-        _timer?.cancel();
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: const Color(0xFFFF6B35),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+    );
+  }
+
+  Future<bool> _ensureLocationPermission() async {
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      _showError(tr('Геолокацияны қосыңыз', 'Включите геолокацию'));
+      return false;
+    }
+
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+    if (permission == LocationPermission.denied) {
+      _showError(tr('Геолокацияға рұқсат беріңіз', 'Разрешите доступ к геолокации'));
+      return false;
+    }
+    if (permission == LocationPermission.deniedForever) {
+      _showError(tr('Геолокацияға қолжетімділік жабық. Баптауларды тексеріңіз.', 'Доступ к геолокации запрещен. Проверьте настройки.'));
+      return false;
+    }
+    return true;
+  }
+
+  Future<void> _ensureActivityRecognitionPermission() async {
+    if (kIsWeb) return;
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      final status = await Permission.activityRecognition.status;
+      if (!status.isGranted) {
+        await Permission.activityRecognition.request();
+      }
+    }
+  }
+
+  LocationSettings _buildLocationSettings() {
+    if (kIsWeb) {
+      return const LocationSettings(
+        accuracy: LocationAccuracy.best,
+        distanceFilter: 5,
+      );
+    }
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      return AndroidSettings(
+        accuracy: LocationAccuracy.bestForNavigation,
+        distanceFilter: 5,
+        intervalDuration: const Duration(seconds: 5),
+        foregroundNotificationConfig: const ForegroundNotificationConfig(
+          notificationTitle: 'Жаттығу белсенді',
+          notificationText: 'Маршрут жазылып жатыр',
+          enableWakeLock: true,
+          setOngoing: true,
+        ),
+      );
+    }
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      return AppleSettings(
+        accuracy: LocationAccuracy.best,
+        activityType: ActivityType.fitness,
+        distanceFilter: 5,
+        pauseLocationUpdatesAutomatically: false,
+        allowBackgroundLocationUpdates: true,
+      );
+    }
+    return const LocationSettings(
+      accuracy: LocationAccuracy.best,
+      distanceFilter: 5,
+    );
+  }
+
+  void _stopTrackingStreams() {
+    _positionSub?.cancel();
+    _positionSub = null;
+    _stepSub?.cancel();
+    _stepSub = null;
+  }
+
+  Future<void> _startPositionStream() async {
+    _positionSub?.cancel();
+
+    try {
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.best,
+      );
+      _onPosition(position);
+    } catch (_) {
+      // Ignore initial read failures; stream may still work.
+    }
+
+    _positionSub = Geolocator.getPositionStream(
+      locationSettings: _buildLocationSettings(),
+    ).listen(_onPosition, onError: (_) {
+      if (mounted) {
+      _showError(tr('GPS қатесі', 'Ошибка GPS'));
       }
     });
+  }
+
+  void _startStepStream() {
+    _stepSub?.cancel();
+    _stepSub = Pedometer.stepCountStream.listen((event) {
+      if (!_hasStepBaseline) {
+        _startSteps = event.steps;
+        _hasStepBaseline = true;
+      }
+      final delta = event.steps - _startSteps;
+      if (delta >= 0) {
+        setState(() {
+          _steps = delta;
+        });
+      }
+    }, onError: (_) {});
+  }
+
+  void _onPosition(Position position) {
+    if (!_isActive || _isPaused) return;
+
+    final point = RoutePoint(
+      latitude: position.latitude,
+      longitude: position.longitude,
+      timestamp: DateTime.now(),
+    );
+
+    double deltaMeters = 0;
+    if (_lastPosition != null) {
+      deltaMeters = Geolocator.distanceBetween(
+        _lastPosition!.latitude,
+        _lastPosition!.longitude,
+        position.latitude,
+        position.longitude,
+      );
+    }
+
+    setState(() {
+      _route.add(point);
+      if (deltaMeters > 0.5) {
+        _distance += deltaMeters / 1000.0;
+      }
+      _lastPosition = position;
+      _elevation = position.altitude;
+
+      if (_distance > 0 && _seconds > 0) {
+        _avgSpeed = (_distance / (_seconds / 3600)).clamp(0, 25);
+        _pace = (_seconds / 60) / _distance;
+      }
+
+      _speedHistory.add(_avgSpeed);
+      _elevationHistory.add(_elevation);
+      if (_speedHistory.length > 30) _speedHistory.removeAt(0);
+      if (_elevationHistory.length > 30) _elevationHistory.removeAt(0);
+
+      _calories = _estimateCalories();
+    });
+  }
+
+  int _estimateCalories() {
+    final perKm = switch (_workoutType) {
+      'running' => 60,
+      'walking' => 45,
+      'cycling' => 30,
+      _ => 40,
+    };
+    return (_distance * perKm).round();
+  }
+
+  Future<void> _toggleWorkout() async {
+    if (!_isActive) {
+      final ok = await _ensureLocationPermission();
+      if (!ok) return;
+
+      setState(() {
+        _isActive = true;
+        _isPaused = false;
+      });
+
+      await _ensureActivityRecognitionPermission();
+      _startTimer();
+      _startPositionStream();
+      _startStepStream();
+    } else if (_isPaused) {
+      setState(() {
+        _isPaused = false;
+      });
+      _startTimer();
+      _startPositionStream();
+      _startStepStream();
+    } else {
+      setState(() {
+        _isPaused = true;
+      });
+      _timer?.cancel();
+      _stopTrackingStreams();
+    }
     HapticFeedback.mediumImpact();
   }
 
   Future<void> _stopWorkout() async {
     _timer?.cancel();
+    _stopTrackingStreams();
 
+    var shouldPop = false;
+    var showSummary = false;
     if (_seconds > 0) {
       try {
         final prefs = await SharedPreferences.getInstance();
-        final String? jsonString = prefs.getString('workouts_history');
-        List<Map<String, dynamic>> workouts = [];
+        final userEmail = prefs.getString('user_email') ?? '';
+        if (userEmail.isEmpty) {
+          _showError(tr('Пайдаланушы email жоқ', 'Нет email пользователя'));
+          shouldPop = true;
+        } else {
+          final workout = {
+            'id': DateTime.now().millisecondsSinceEpoch.toString(),
+            'type': _workoutType,
+            'name': _getWorkoutName(),
+            'date': DateTime.now().toIso8601String(),
+            'durationSeconds': _seconds,
+            'distance': _distance,
+            'calories': _calories,
+            'steps': _steps,
+            'avgSpeed': _avgSpeed,
+            'pace': _pace,
+            'elevation': _elevation,
+            'route': _route
+                .map((p) => {
+              'latitude': p.latitude,
+              'longitude': p.longitude,
+              'timestamp': p.timestamp.toIso8601String(),
+            })
+                .toList(),
+            'userEmail': userEmail,
+          };
 
-        if (jsonString != null) {
-          final List<dynamic> jsonList = json.decode(jsonString);
-          workouts = jsonList.cast<Map<String, dynamic>>();
-        }
+          final response = await http.post(
+            Uri.parse('${ApiConfig.baseUrl}/workouts'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(workout),
+          );
 
-        final workout = {
-          'id': DateTime.now().millisecondsSinceEpoch.toString(),
-          'type': _workoutType,
-          'name': _getWorkoutName(),
-          'date': DateTime.now().toIso8601String(),
-          'durationSeconds': _seconds,
-          'distance': _distance,
-          'calories': _calories,
-          'steps': _steps,
-          'avgHeartRate': _heartRateCount > 0 ? (_totalHeartRate / _heartRateCount).round() : 0,
-          'maxHeartRate': _maxHeartRate,
-          'avgSpeed': _avgSpeed,
-          'pace': _pace,
-          'elevation': _elevation,
-        };
-
-        workouts.insert(0, workout);
-        await prefs.setString('workouts_history', json.encode(workouts));
-
-        if (mounted) {
-          _showWorkoutSummary();
+          if (response.statusCode != 200) {
+            _showError(tr('Жаттығуды сақтау мүмкін болмады', 'Не удалось сохранить тренировку'));
+            shouldPop = true;
+          } else {
+            showSummary = true;
+          }
         }
       } catch (e) {
-        Navigator.pop(context);
+        shouldPop = true;
       }
     } else {
-      Navigator.pop(context);
+      shouldPop = true;
     }
 
+    if (showSummary && mounted) {
+      await _showWorkoutSummary();
+    }
+
+    if (!mounted) return;
     setState(() {
       _isActive = false;
       _isPaused = false;
       _seconds = 0;
       _distance = 0.0;
       _calories = 0;
-      _heartRate = 0;
       _steps = 0;
       _avgSpeed = 0.0;
       _pace = 0.0;
       _elevation = 0.0;
-      _maxHeartRate = 0;
-      _heartRateHistory.clear();
       _speedHistory.clear();
       _elevationHistory.clear();
-      _totalHeartRate = 0;
-      _heartRateCount = 0;
+      _route.clear();
+      _lastPosition = null;
+      _hasStepBaseline = false;
+      _startSteps = 0;
     });
 
     HapticFeedback.heavyImpact();
+
+    if (shouldPop) {
+      Navigator.pop(context);
+    }
   }
 
-  void _showWorkoutSummary() {
-    showModalBottomSheet(
+  Future<void> _showWorkoutSummary() {
+    return showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -195,9 +419,9 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
 
             const SizedBox(height: 16),
 
-            const Text(
-              'Отличная работа!',
-              style: TextStyle(
+            Text(
+              tr('Керемет жұмыс!', 'Отличная работа!'),
+              style: const TextStyle(
                 fontSize: 28,
                 fontWeight: FontWeight.w900,
                 color: Colors.white,
@@ -226,7 +450,7 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
                       children: [
                         Expanded(
                           child: _buildSummaryCard(
-                            'Время',
+                            tr('Уақыт', 'Время'),
                             _formatTime(_seconds),
                             Icons.timer_outlined,
                             const Color(0xFF00D9FF),
@@ -235,7 +459,7 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
                         const SizedBox(width: 12),
                         Expanded(
                           child: _buildSummaryCard(
-                            'Дистанция',
+                            tr('Қашықтық', 'Дистанция'),
                             '${_distance.toStringAsFixed(2)} км',
                             Icons.route_rounded,
                             const Color(0xFF7C3AED),
@@ -250,8 +474,8 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
                       children: [
                         Expanded(
                           child: _buildSummaryCard(
-                            'Калории',
-                            '$_calories ккал',
+                            tr('Калория', 'Калории'),
+                            '$_calories ${tr('ккал', 'ккал')}',
                             Icons.local_fire_department_rounded,
                             const Color(0xFFFF6B35),
                           ),
@@ -259,16 +483,27 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
                         const SizedBox(width: 12),
                         Expanded(
                           child: _buildSummaryCard(
-                            'Ср. пульс',
-                            '${_heartRateCount > 0 ? (_totalHeartRate / _heartRateCount).round() : 0}',
-                            Icons.favorite_rounded,
-                            const Color(0xFFEC4899),
+                            tr('Қадамдар', 'Шаги'),
+                            '$_steps ${tr('қадам', 'шагов')}',
+                            Icons.directions_walk_rounded,
+                            const Color(0xFF00D9FF),
                           ),
                         ),
                       ],
                     ),
 
                     const SizedBox(height: 24),
+
+                    if (_route.isNotEmpty) ...[
+                      SizedBox(
+                        height: 220,
+                        child: MapWidget(
+                          route: _route,
+                          followUser: false,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                    ],
 
                     Container(
                       padding: const EdgeInsets.all(20),
@@ -278,15 +513,14 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
                       ),
                       child: Column(
                         children: [
-                          _buildSummaryRow('Шаги', '$_steps шагов'),
+                          _buildSummaryRow(tr('Қадамдар', 'Шаги'), '$_steps ${tr('қадам', 'шагов')}'),
                           const Divider(color: Colors.white12, height: 24),
-                          _buildSummaryRow('Скорость', '${_avgSpeed.toStringAsFixed(1)} км/ч'),
+                          _buildSummaryRow(tr('Жылдамдық', 'Скорость'), '${_avgSpeed.toStringAsFixed(1)} км/ч'),
                           const Divider(color: Colors.white12, height: 24),
-                          _buildSummaryRow('Темп', '${_pace.toStringAsFixed(1)} мин/км'),
+                          _buildSummaryRow(tr('Қарқын', 'Темп'), '${_pace.toStringAsFixed(1)} мин/км'),
                           const Divider(color: Colors.white12, height: 24),
-                          _buildSummaryRow('Макс. пульс', '$_maxHeartRate bpm'),
                           const Divider(color: Colors.white12, height: 24),
-                          _buildSummaryRow('Набор высоты', '${_elevation.toStringAsFixed(0)} м'),
+                          _buildSummaryRow(tr('Биіктік өсімі', 'Набор высоты'), '${_elevation.toStringAsFixed(0)} м'),
                         ],
                       ),
                     ),
@@ -315,10 +549,10 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
                           ),
                           borderRadius: BorderRadius.circular(14),
                         ),
-                        child: const Center(
+                        child: Center(
                           child: Text(
-                            'Завершить',
-                            style: TextStyle(
+                            tr('Аяқтау', 'Завершить'),
+                            style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w700,
                               color: Colors.white,
@@ -398,36 +632,12 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
   void _startTimer() {
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!_isActive || _isPaused) return;
       setState(() {
         _seconds++;
-
-        final random = math.Random();
-        _distance += 0.004 + random.nextDouble() * 0.006;
-        _calories += random.nextInt(3);
-        _heartRate = 110 + random.nextInt(50);
-        _steps += (2 + random.nextInt(3));
-        _elevation += random.nextDouble() * 0.5 - 0.2;
-
-        if (_heartRate > _maxHeartRate) {
-          _maxHeartRate = _heartRate;
-        }
-
-        _totalHeartRate += _heartRate;
-        _heartRateCount++;
-
         if (_distance > 0 && _seconds > 0) {
           _avgSpeed = (_distance / (_seconds / 3600)).clamp(0, 25);
           _pace = (_seconds / 60) / _distance;
-        }
-
-        _heartRateHistory.add(_heartRate);
-        _speedHistory.add(_avgSpeed);
-        _elevationHistory.add(_elevation);
-
-        if (_heartRateHistory.length > 30) {
-          _heartRateHistory.removeAt(0);
-          _speedHistory.removeAt(0);
-          _elevationHistory.removeAt(0);
         }
       });
     });
@@ -442,14 +652,14 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
 
   String _getWorkoutName() {
     switch (_workoutType) {
-      case 'running': return 'Бег';
-      case 'walking': return 'Ходьба';
-      case 'cycling': return 'Велосипед';
+      case 'running': return tr('Жүгіру', 'Бег');
+      case 'walking': return tr('Жүру', 'Ходьба');
+      case 'cycling': return tr('Велосипед', 'Велосипед');
       case 'hiit': return 'HIIT';
-      case 'yoga': return 'Йога';
-      case 'swimming': return 'Плавание';
-      case 'strength': return 'Силовая';
-      default: return 'Тренировка';
+      case 'yoga': return tr('Йога', 'Йога');
+      case 'swimming': return tr('Жүзу', 'Плавание');
+      case 'strength': return tr('Күш', 'Силовая');
+      default: return tr('Жаттығу', 'Тренировка');
     }
   }
 
@@ -464,22 +674,6 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
       case 'strength': return Icons.fitness_center_rounded;
       default: return Icons.fitness_center_rounded;
     }
-  }
-
-  String _getHeartRateZone() {
-    if (_heartRate < 100) return 'Разминка';
-    if (_heartRate < 120) return 'Жиросжигание';
-    if (_heartRate < 140) return 'Кардио';
-    if (_heartRate < 160) return 'Пиковая';
-    return 'Максимальная';
-  }
-
-  Color _getHeartRateZoneColor() {
-    if (_heartRate < 100) return const Color(0xFF10B981);
-    if (_heartRate < 120) return const Color(0xFFEAB308);
-    if (_heartRate < 140) return const Color(0xFFFFA500);
-    if (_heartRate < 160) return const Color(0xFFFF6B35);
-    return const Color(0xFFEF4444);
   }
 
   @override
@@ -503,27 +697,27 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
                           builder: (context) => AlertDialog(
                             backgroundColor: const Color(0xFF1C2130),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                            title: const Text(
-                              'Завершить тренировку?',
-                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+                            title: Text(
+                              tr('Жаттығуды аяқтайсыз ба?', 'Завершить тренировку?'),
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
                             ),
-                            content: const Text(
-                              'Вы потеряете текущий прогресс',
-                              style: TextStyle(color: Colors.white54),
+                            content: Text(
+                              tr('Ағымдағы прогресс жоғалады', 'Вы потеряете текущий прогресс'),
+                              style: const TextStyle(color: Colors.white54),
                             ),
                             actions: [
                               TextButton(
                                 onPressed: () => Navigator.pop(context),
-                                child: const Text('Отмена', style: TextStyle(color: Colors.white54)),
+                                child: Text(tr('Бас тарту', 'Отмена'), style: const TextStyle(color: Colors.white54)),
                               ),
                               TextButton(
                                 onPressed: () {
                                   Navigator.pop(context);
                                   Navigator.pop(context);
                                 },
-                                child: const Text(
-                                  'Выйти',
-                                  style: TextStyle(color: Color(0xFFFF6B35), fontWeight: FontWeight.w700),
+                                child: Text(
+                                  tr('Шығу', 'Выйти'),
+                                  style: const TextStyle(color: Color(0xFFFF6B35), fontWeight: FontWeight.w700),
                                 ),
                               ),
                             ],
@@ -576,7 +770,7 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
                               ),
                               const SizedBox(width: 4),
                               Text(
-                                _isPaused ? 'Пауза' : 'В процессе',
+                                _isPaused ? tr('Үзіліс', 'Пауза') : tr('Жүріп жатыр', 'В процессе'),
                                 style: TextStyle(
                                   fontSize: 10,
                                   fontWeight: FontWeight.w600,
@@ -677,8 +871,8 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
                               const SizedBox(height: 4),
                               Text(
                                 _isActive
-                                    ? (_isPaused ? 'ПАУЗА' : 'АКТИВНО')
-                                    : 'ГОТОВ',
+                                    ? (_isPaused ? tr('ҮЗІЛІС', 'ПАУЗА') : tr('БЕЛСЕНДІ', 'АКТИВНО'))
+                                    : tr('ДАЙЫН', 'ГОТОВ'),
                                 style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w700,
@@ -702,7 +896,7 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
                           child: _buildLiveMetricCard(
                             '${_distance.toStringAsFixed(2)}',
                             'км',
-                            'Дистанция',
+                            tr('Қашықтық', 'Дистанция'),
                             Icons.route_rounded,
                             const Color(0xFF00D9FF),
                           ),
@@ -711,8 +905,8 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
                         Expanded(
                           child: _buildLiveMetricCard(
                             '$_calories',
-                            'ккал',
-                            'Калории',
+                            tr('ккал', 'ккал'),
+                            tr('Калория', 'Калории'),
                             Icons.local_fire_department_rounded,
                             const Color(0xFFFF6B35),
                           ),
@@ -728,7 +922,7 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
                           child: _buildLiveMetricCard(
                             _isActive ? '${_avgSpeed.toStringAsFixed(1)}' : '--',
                             'км/ч',
-                            'Скорость',
+                            tr('Жылдамдық', 'Скорость'),
                             Icons.speed_rounded,
                             const Color(0xFF7C3AED),
                           ),
@@ -738,7 +932,7 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
                           child: _buildLiveMetricCard(
                             _isActive && _distance > 0 ? '${_pace.toStringAsFixed(1)}' : '--',
                             'мин/км',
-                            'Темп',
+                            tr('Қарқын', 'Темп'),
                             Icons.timer_outlined,
                             const Color(0xFFEAB308),
                           ),
@@ -748,102 +942,17 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
 
                     const SizedBox(height: 24),
 
-                    if (_isActive && _heartRateHistory.length > 3)
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              _getHeartRateZoneColor().withOpacity(0.15),
-                              _getHeartRateZoneColor().withOpacity(0.05),
-                            ],
-                          ),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: _getHeartRateZoneColor().withOpacity(0.3),
-                            width: 1.5,
-                          ),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Row(
-                                  children: [
-                                    Icon(Icons.favorite_rounded, color: _getHeartRateZoneColor(), size: 20),
-                                    const SizedBox(width: 8),
-                                    const Text(
-                                      'Пульс',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w700,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: _getHeartRateZoneColor().withOpacity(0.2),
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: _getHeartRateZoneColor(),
-                                      width: 1,
-                                    ),
-                                  ),
-                                  child: Text(
-                                    _getHeartRateZone(),
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                      color: _getHeartRateZoneColor(),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                Text(
-                                  '$_heartRate',
-                                  style: const TextStyle(
-                                    fontSize: 48,
-                                    fontWeight: FontWeight.w900,
-                                    color: Colors.white,
-                                    letterSpacing: -2,
-                                  ),
-                                ),
-                                const Padding(
-                                  padding: EdgeInsets.only(bottom: 8, left: 4),
-                                  child: Text(
-                                    'bpm',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.white54,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-                            SizedBox(
-                              height: 80,
-                              child: CustomPaint(
-                                size: Size.infinite,
-                                painter: HeartRateChartPainter(_heartRateHistory, _getHeartRateZoneColor()),
-                              ),
-                            ),
-                          ],
-                        ),
+                    SizedBox(
+                      height: 220,
+                      child: MapWidget(
+                        route: _route,
+                        followUser: true,
                       ),
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    const SizedBox.shrink(),
 
                     const SizedBox(height: 24),
 
@@ -852,7 +961,7 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
                         Expanded(
                           child: _buildSmallMetricCard(
                             '$_steps',
-                            'Шаги',
+                            tr('Қадамдар', 'Шаги'),
                             Icons.directions_walk_rounded,
                             const Color(0xFF10B981),
                           ),
@@ -861,7 +970,7 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
                         Expanded(
                           child: _buildSmallMetricCard(
                             '${_elevation.toStringAsFixed(0)} м',
-                            'Набор высоты',
+                            tr('Биіктік өсімі', 'Набор высоты'),
                             Icons.terrain_rounded,
                             const Color(0xFF8B5CF6),
                           ),
@@ -905,15 +1014,15 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
                                 width: 1.5,
                               ),
                             ),
-                            child: const Center(
+                            child: Center(
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.stop_rounded, color: Color(0xFFFF6B35), size: 20),
-                                  SizedBox(width: 8),
+                                  const Icon(Icons.stop_rounded, color: Color(0xFFFF6B35), size: 20),
+                                  const SizedBox(width: 8),
                                   Text(
-                                    'Завершить',
-                                    style: TextStyle(
+                                    tr('Аяқтау', 'Завершить'),
+                                    style: const TextStyle(
                                       fontSize: 15,
                                       fontWeight: FontWeight.w700,
                                       color: Color(0xFFFF6B35),
@@ -964,8 +1073,8 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
                                 const SizedBox(width: 8),
                                 Text(
                                   !_isActive
-                                      ? 'Старт'
-                                      : (_isPaused ? 'Продолжить' : 'Пауза'),
+                                      ? tr('Бастау', 'Старт')
+                                      : (_isPaused ? tr('Жалғастыру', 'Продолжить') : tr('Үзіліс', 'Пауза')),
                                   style: const TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w700,
@@ -1095,65 +1204,4 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
       ),
     );
   }
-}
-
-class HeartRateChartPainter extends CustomPainter {
-  final List<int> data;
-  final Color color;
-
-  HeartRateChartPainter(this.data, this.color);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (data.length < 2) return;
-
-    final paint = Paint()
-      ..color = color
-      ..strokeWidth = 3
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-
-    final path = Path();
-    final maxValue = data.reduce(math.max).toDouble();
-    final minValue = data.reduce(math.min).toDouble();
-    final range = maxValue - minValue;
-
-    for (int i = 0; i < data.length; i++) {
-      final x = (i / (data.length - 1)) * size.width;
-      final normalizedValue = range > 0 ? (data[i] - minValue) / range : 0.5;
-      final y = size.height - (normalizedValue * size.height * 0.8) - (size.height * 0.1);
-
-      if (i == 0) {
-        path.moveTo(x, y);
-      } else {
-        path.lineTo(x, y);
-      }
-    }
-
-    canvas.drawPath(path, paint);
-
-    final fillPath = Path.from(path);
-    fillPath.lineTo(size.width, size.height);
-    fillPath.lineTo(0, size.height);
-    fillPath.close();
-
-    final gradient = LinearGradient(
-      begin: Alignment.topCenter,
-      end: Alignment.bottomCenter,
-      colors: [
-        color.withOpacity(0.3),
-        color.withOpacity(0.0),
-      ],
-    );
-
-    final fillPaint = Paint()
-      ..shader = gradient.createShader(Rect.fromLTWH(0, 0, size.width, size.height))
-      ..style = PaintingStyle.fill;
-
-    canvas.drawPath(fillPath, fillPaint);
-  }
-
-  @override
-  bool shouldRepaint(HeartRateChartPainter oldDelegate) => true;
 }

@@ -3,8 +3,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'features/workout/presentation/pages/home_page.dart';
 import 'features/workout/presentation/pages/tracking_page.dart';
 import 'features/workout/presentation/pages/auth/login_page.dart';
+import 'core/localization/app_lang.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await loadAppLang();
   runApp(const MyApp());
 }
 
@@ -13,19 +16,24 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'Fitness App',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        fontFamily: 'SF Pro',
-      ),
-      initialRoute: '/',
-      routes: {
-        '/': (context) => const SplashScreen(),
-        '/login': (context) => const LoginPage(),
-        '/home': (context) => const MainScreen(),
-        '/tracking': (context) => const TrackingPage(),
+    return ValueListenableBuilder<String>(
+      valueListenable: appLang,
+      builder: (context, _, __) {
+        return MaterialApp(
+          debugShowCheckedModeBanner: false,
+          title: 'Fitness App',
+          theme: ThemeData(
+            primarySwatch: Colors.blue,
+            fontFamily: 'SF Pro',
+          ),
+          initialRoute: '/',
+          routes: {
+            '/': (context) => const SplashScreen(),
+            '/login': (context) => const LoginPage(),
+            '/home': (context) => const MainScreen(),
+            '/tracking': (context) => const TrackingPage(),
+          },
+        );
       },
     );
   }

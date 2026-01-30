@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/localization/app_lang.dart';
+
 class HistoryPage extends StatelessWidget {
   const HistoryPage({super.key});
 
@@ -7,13 +9,10 @@ class HistoryPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('История тренировок'),
+        title: Text(tr('Жаттығу тарихы', 'История тренировок')),
       ),
       body: const Center(
-        child: Text(
-          'Список тренировок',
-          style: TextStyle(fontSize: 20),
-        ),
+        child: SizedBox.shrink(),
       ),
     );
   }

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../../core/localization/app_lang.dart';
+
 class GoalsPage extends StatefulWidget {
   const GoalsPage({super.key});
 
@@ -46,9 +48,9 @@ class _GoalsPageState extends State<GoalsPage> {
           icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          'Цели тренировок',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+        title: Text(
+          tr('Жаттығу мақсаттары', 'Цели тренировок'),
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
         ),
       ),
       body: SingleChildScrollView(
@@ -56,7 +58,7 @@ class _GoalsPageState extends State<GoalsPage> {
         child: Column(
           children: [
             _buildGoalCard(
-              'Дистанция в неделю',
+              tr('Апталық қашықтық', 'Дистанция в неделю'),
               '${_weeklyDistance.toStringAsFixed(1)} км',
               Icons.route_rounded,
               const Color(0xFF00D9FF),
@@ -75,7 +77,7 @@ class _GoalsPageState extends State<GoalsPage> {
             ),
             const SizedBox(height: 16),
             _buildGoalCard(
-              'Тренировок в неделю',
+              tr('Апталық жаттығулар', 'Тренировок в неделю'),
               '$_weeklyWorkouts',
               Icons.fitness_center_rounded,
               const Color(0xFF7C3AED),
@@ -94,8 +96,8 @@ class _GoalsPageState extends State<GoalsPage> {
             ),
             const SizedBox(height: 16),
             _buildGoalCard(
-              'Калорий в день',
-              '$_dailyCalories ккал',
+              tr('Күніне калория', 'Калорий в день'),
+              '$_dailyCalories ${tr('ккал', 'ккал')}',
               Icons.local_fire_department_rounded,
               const Color(0xFFFF6B35),
               Slider(

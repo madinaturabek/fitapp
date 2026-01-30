@@ -7,7 +7,6 @@ class WorkoutModel {
   final double distance;
   final int calories;
   final int steps;
-  final int avgHeartRate;
   final double avgSpeed;
   final double pace;
 
@@ -20,7 +19,6 @@ class WorkoutModel {
     required this.distance,
     required this.calories,
     required this.steps,
-    required this.avgHeartRate,
     required this.avgSpeed,
     required this.pace,
   });
@@ -35,7 +33,6 @@ class WorkoutModel {
       'distance': distance,
       'calories': calories,
       'steps': steps,
-      'avgHeartRate': avgHeartRate,
       'avgSpeed': avgSpeed,
       'pace': pace,
     };
@@ -51,7 +48,6 @@ class WorkoutModel {
       distance: json['distance'],
       calories: json['calories'],
       steps: json['steps'],
-      avgHeartRate: json['avgHeartRate'],
       avgSpeed: json['avgSpeed'],
       pace: json['pace'],
     );

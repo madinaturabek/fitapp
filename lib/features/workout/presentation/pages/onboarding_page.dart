@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../core/localization/app_lang.dart';
+
 class OnboardingPage extends StatefulWidget {
   const OnboardingPage({super.key});
 
@@ -15,21 +17,30 @@ class _OnboardingPageState extends State<OnboardingPage> {
   final List<OnboardingData> _pages = [
     OnboardingData(
       image: 'assets/onboarding_1.jpg',
-      title: 'Get started\nwith your\nhealth goals',
-      description: '45 mins\nDuration',
-      heartRate: '124 bpm\nAverage Heart Rate',
+      titleKk: 'Денсаулық\nмақсатымен\nбастаңыз',
+      titleRu: 'Начните путь\nк целям\nздоровья',
+      descriptionKk: 'Жаттығу\nұзақтығы',
+      descriptionRu: 'Длительность\nтренировки',
+      heartRateKk: 'Орташа\nжүрек соғысы',
+      heartRateRu: 'Средний\nпульс',
     ),
     OnboardingData(
       image: 'assets/onboarding_2.jpg',
-      title: 'Track your\nprogress\ndaily',
-      description: '480 cal\nCalories Burned',
-      heartRate: '135 bpm\nMax Heart Rate',
+      titleKk: 'Күн сайын\nпрогресті\nбақылаңыз',
+      titleRu: 'Следите за\nпрогрессом\nежедневно',
+      descriptionKk: 'Калория\nжанып жатыр',
+      descriptionRu: 'Сожженные\nкалории',
+      heartRateKk: 'Макс\nжүрек соғысы',
+      heartRateRu: 'Макс\nпульс',
     ),
     OnboardingData(
       image: 'assets/onboarding_3.jpg',
-      title: 'Achieve your\nfitness\ngoals',
-      description: '8.3k steps\nToday',
-      heartRate: '60 mins\nActive Duration',
+      titleKk: 'Фитнес\nмақсатқа\nжетыңыз',
+      titleRu: 'Достигайте\nфитнес\nцелей',
+      descriptionKk: 'Күндік\nқадам',
+      descriptionRu: 'Шаги\nза день',
+      heartRateKk: 'Белсенді\nуақыт',
+      heartRateRu: 'Активное\nвремя',
     ),
   ];
 
@@ -65,9 +76,9 @@ class _OnboardingPageState extends State<OnboardingPage> {
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: Colors.white.withOpacity(0.3)),
                 ),
-                child: const Text(
-                  'Skip',
-                  style: TextStyle(
+                child: Text(
+                  tr('Өткізу', 'Пропустить'),
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -141,8 +152,8 @@ class _OnboardingPageState extends State<OnboardingPage> {
                       child: Center(
                         child: Text(
                           _currentPage < _pages.length - 1
-                              ? 'Next'
-                              : 'Get Started',
+                              ? tr('Келесі', 'Далее')
+                              : tr('Бастау', 'Начать'),
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
@@ -229,7 +240,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      data.description,
+                      tr(data.descriptionKk, data.descriptionRu),
                       style: const TextStyle(
                         fontSize: 32,
                         fontWeight: FontWeight.w800,
@@ -239,7 +250,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      data.heartRate,
+                      tr(data.heartRateKk, data.heartRateRu),
                       style: TextStyle(
                         fontSize: 14,
                         color: Colors.white.withOpacity(0.7),
@@ -254,7 +265,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
 
               // Title
               Text(
-                data.title,
+                tr(data.titleKk, data.titleRu),
                 style: const TextStyle(
                   fontSize: 48,
                   fontWeight: FontWeight.w800,
@@ -275,15 +286,21 @@ class _OnboardingPageState extends State<OnboardingPage> {
 
 class OnboardingData {
   final String image;
-  final String title;
-  final String description;
-  final String heartRate;
+  final String titleKk;
+  final String titleRu;
+  final String descriptionKk;
+  final String descriptionRu;
+  final String heartRateKk;
+  final String heartRateRu;
 
   OnboardingData({
     required this.image,
-    required this.title,
-    required this.description,
-    required this.heartRate,
+    required this.titleKk,
+    required this.titleRu,
+    required this.descriptionKk,
+    required this.descriptionRu,
+    required this.heartRateKk,
+    required this.heartRateRu,
   });
 }
 

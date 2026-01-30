@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:math' as math;
 
+import '../../../../core/localization/app_lang.dart';
+
 class TrackingPage extends StatefulWidget {
   const TrackingPage({super.key});
 
@@ -16,19 +18,15 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
   int _seconds = 0;
   Timer? _timer;
 
-  double _distance = 0.0;
-  int _calories = 0;
-  int _heartRate = 0;
-  int _steps = 0;
+  final double _distance = 0.0;
+  final int _calories = 0;
+  final int _steps = 0;
   double _avgSpeed = 0.0;
-  double _elevation = 0.0;
+  final double _elevation = 0.0;
   double _maxSpeed = 0.0;
-  int _maxHeartRate = 0;
-  int _avgHeartRate = 0;
 
   String _workoutType = 'running';
 
-  final List<int> _heartRateHistory = [];
   final List<double> _speedHistory = [];
   final List<MapEntry<int, double>> _splitTimes = []; // время и дистанция каждого километра
 
@@ -112,7 +110,7 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          'Круг ${_splitTimes.length} записан',
+          '${tr('Айналым', 'Круг')} ${_splitTimes.length} ${tr('жазылды', 'записан')}',
           style: const TextStyle(fontWeight: FontWeight.w600),
         ),
         backgroundColor: const Color(0xFF00D9FF),
@@ -151,7 +149,7 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.3),
+                  color: Colors.white.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -168,8 +166,8 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
                               colors: [
-                                const Color(0xFF00D9FF).withOpacity(0.2),
-                                const Color(0xFF4a90e2).withOpacity(0.1),
+                                const Color(0xFF00D9FF).withValues(alpha: 0.2),
+                                const Color(0xFF4a90e2).withValues(alpha: 0.1),
                               ],
                             ),
                             borderRadius: BorderRadius.circular(20),
@@ -181,9 +179,9 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
                           ),
                         ),
                         const SizedBox(height: 16),
-                        const Text(
-                          'Отличная работа!',
-                          style: TextStyle(
+                        Text(
+                          tr('Керемет жұмыс!', 'Отличная работа!'),
+                          style: const TextStyle(
                             fontSize: 28,
                             fontWeight: FontWeight.w900,
                             color: Colors.white,
@@ -191,10 +189,10 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Тренировка завершена',
+                          tr('Жаттығу аяқталды', 'Тренировка завершена'),
                           style: TextStyle(
                             fontSize: 16,
-                            color: Colors.white.withOpacity(0.6),
+                            color: Colors.white.withValues(alpha: 0.6),
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -206,7 +204,7 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
                             Expanded(
                               child: _buildSummaryCard(
                                 Icons.timer_rounded,
-                                'Время',
+                                tr('Уақыт', 'Время'),
                                 _formatTime(_seconds),
                                 const Color(0xFF00D9FF),
                               ),
@@ -215,7 +213,7 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
                             Expanded(
                               child: _buildSummaryCard(
                                 Icons.route_rounded,
-                                'Дистанция',
+                                tr('Қашықтық', 'Дистанция'),
                                 '${_distance.toStringAsFixed(2)} км',
                                 const Color(0xFF10B981),
                               ),
@@ -228,18 +226,18 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
                             Expanded(
                               child: _buildSummaryCard(
                                 Icons.local_fire_department_rounded,
-                                'Калории',
-                                '$_calories ккал',
+                                tr('Калория', 'Калории'),
+                                '$_calories ${tr('ккал', 'ккал')}',
                                 const Color(0xFFEF4444),
                               ),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
                               child: _buildSummaryCard(
-                                Icons.favorite_rounded,
-                                'Ср. пульс',
-                                _avgHeartRate > 0 ? '$_avgHeartRate bpm' : '--',
-                                const Color(0xFFEC4899),
+                                Icons.directions_walk_rounded,
+                                tr('Қадамдар', 'Шаги'),
+                                '$_steps ${tr('қадам', 'шагов')}',
+                                const Color(0xFF00D9FF),
                               ),
                             ),
                           ],
@@ -251,31 +249,30 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
                         Container(
                           padding: const EdgeInsets.all(20),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.05),
+                            color: Colors.white.withValues(alpha: 0.05),
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(
-                              color: Colors.white.withOpacity(0.1),
+                              color: Colors.white.withValues(alpha: 0.1),
                             ),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text(
-                                'Детали',
-                                style: TextStyle(
+                              Text(
+                                tr('Детальдар', 'Детали'),
+                                style: const TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.w700,
                                   color: Colors.white,
                                 ),
                               ),
                               const SizedBox(height: 16),
-                              _buildDetailRow('Макс. скорость', '${_maxSpeed.toStringAsFixed(1)} км/ч'),
-                              _buildDetailRow('Макс. пульс', '$_maxHeartRate bpm'),
-                              _buildDetailRow('Темп', _distance > 0 ? '${(_seconds / 60 / _distance).toStringAsFixed(1)} мин/км' : '--'),
-                              _buildDetailRow('Шаги', '$_steps'),
-                              _buildDetailRow('Набор высоты', '${_elevation.toStringAsFixed(0)} м'),
+                              _buildDetailRow(tr('Макс. жылдамдық', 'Макс. скорость'), '${_maxSpeed.toStringAsFixed(1)} км/ч'),
+                              _buildDetailRow(tr('Қарқын', 'Темп'), _distance > 0 ? '${(_seconds / 60 / _distance).toStringAsFixed(1)} мин/км' : '--'),
+                              _buildDetailRow(tr('Қадамдар', 'Шаги'), _steps.toString()),
+                              _buildDetailRow(tr('Биіктік өсімі', 'Набор высоты'), '${_elevation.toStringAsFixed(0)} м'),
                               if (_splitTimes.isNotEmpty)
-                                _buildDetailRow('Кругов', '${_splitTimes.length}'),
+                                _buildDetailRow(tr('Айналымдар', 'Кругов'), '${_splitTimes.length}'),
                             ],
                           ),
                         ),
@@ -286,18 +283,18 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
                           Container(
                             padding: const EdgeInsets.all(20),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.05),
+                              color: Colors.white.withValues(alpha: 0.05),
                               borderRadius: BorderRadius.circular(16),
                               border: Border.all(
-                                color: Colors.white.withOpacity(0.1),
+                                color: Colors.white.withValues(alpha: 0.1),
                               ),
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
-                                  'Круги',
-                                  style: TextStyle(
+                                Text(
+                                  tr('Айналымдар', 'Круги'),
+                                  style: const TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.w700,
                                     color: Colors.white,
@@ -316,9 +313,9 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
                                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
                                         Text(
-                                          'Круг ${index + 1}',
+                                          '${tr('Айналым', 'Круг')} ${index + 1}',
                                           style: TextStyle(
-                                            color: Colors.white.withOpacity(0.7),
+                                            color: Colors.white.withValues(alpha: 0.7),
                                             fontWeight: FontWeight.w500,
                                           ),
                                         ),
@@ -332,7 +329,7 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
                                       ],
                                     ),
                                   );
-                                }).toList(),
+                                }),
                               ],
                             ),
                           ),
@@ -347,18 +344,17 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
                               child: GestureDetector(
                                 onTap: () {
                                   Navigator.pop(context);
-                                  Navigator.pop(context);
                                 },
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(vertical: 16),
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.1),
+                                    color: Colors.white.withValues(alpha: 0.1),
                                     borderRadius: BorderRadius.circular(14),
                                   ),
-                                  child: const Center(
+                                  child: Center(
                                     child: Text(
-                                      'Отменить',
-                                      style: TextStyle(
+                                      tr('Болдырмау', 'Отменить'),
+                                      style: const TextStyle(
                                         fontSize: 16,
                                         fontWeight: FontWeight.w600,
                                         color: Colors.white,
@@ -375,11 +371,9 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
                                 onTap: () {
                                   HapticFeedback.mediumImpact();
                                   // Здесь сохранение тренировки
-                                  Navigator.pop(context);
-                                  Navigator.pop(context);
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
-                                      content: const Text('Тренировка сохранена!'),
+                                      content: Text(tr('Жаттығу сақталды!', 'Тренировка сохранена!')),
                                       backgroundColor: const Color(0xFF10B981),
                                       behavior: SnackBarBehavior.floating,
                                       shape: RoundedRectangleBorder(
@@ -387,6 +381,8 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
                                       ),
                                     ),
                                   );
+                                  Navigator.pop(context);
+                                  Navigator.pop(context);
                                 },
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(vertical: 16),
@@ -397,16 +393,16 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
                                     borderRadius: BorderRadius.circular(14),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: const Color(0xFF00D9FF).withOpacity(0.3),
+                                        color: const Color(0xFF00D9FF).withValues(alpha: 0.3),
                                         blurRadius: 20,
                                         offset: const Offset(0, 10),
                                       ),
                                     ],
                                   ),
-                                  child: const Center(
+                                  child: Center(
                                     child: Text(
-                                      'Сохранить тренировку',
-                                      style: TextStyle(
+                                      tr('Жаттығуды сақтау', 'Сохранить тренировку'),
+                                      style: const TextStyle(
                                         fontSize: 16,
                                         fontWeight: FontWeight.w700,
                                         color: Colors.white,
@@ -434,10 +430,10 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
+        color: Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: color.withOpacity(0.3),
+          color: color.withValues(alpha: 0.3),
         ),
       ),
       child: Column(
@@ -445,7 +441,7 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.2),
+              color: color.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(icon, color: color, size: 24),
@@ -455,7 +451,7 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
             label,
             style: TextStyle(
               fontSize: 12,
-              color: Colors.white.withOpacity(0.6),
+              color: Colors.white.withValues(alpha: 0.6),
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -483,7 +479,7 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
           Text(
             label,
             style: TextStyle(
-              color: Colors.white.withOpacity(0.6),
+              color: Colors.white.withValues(alpha: 0.6),
               fontSize: 14,
               fontWeight: FontWeight.w500,
             ),
@@ -506,33 +502,15 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       setState(() {
         _seconds++;
+        if (_distance > 0 && _seconds > 0) {
+          final currentSpeed =
+              (_distance / (_seconds / 3600)).clamp(0.0, 25.0).toDouble();
+          _avgSpeed = currentSpeed;
+          _speedHistory.add(currentSpeed);
+          if (_speedHistory.length > 20) _speedHistory.removeAt(0);
 
-        // Симуляция данных
-        final speedVariation = 0.01 + math.Random().nextDouble() * 0.02;
-        _distance += speedVariation;
-
-        final currentSpeed =
-        (_distance / (_seconds / 3600)).clamp(0.0, 25.0).toDouble();
-        _avgSpeed = currentSpeed;
-        _speedHistory.add(currentSpeed);
-        if (_speedHistory.length > 20) _speedHistory.removeAt(0);
-
-        if (currentSpeed > _maxSpeed) _maxSpeed = currentSpeed;
-
-        _calories = (_seconds * 0.15 + _distance * 50).round();
-        _heartRate = (120 + math.Random().nextInt(40)).clamp(60, 200);
-
-        if (_heartRate > _maxHeartRate) _maxHeartRate = _heartRate;
-
-        _heartRateHistory.add(_heartRate);
-        if (_heartRateHistory.length > 30) _heartRateHistory.removeAt(0);
-
-        if (_heartRateHistory.isNotEmpty) {
-          _avgHeartRate = (_heartRateHistory.reduce((a, b) => a + b) / _heartRateHistory.length).round();
+          if (currentSpeed > _maxSpeed) _maxSpeed = currentSpeed;
         }
-
-        _steps += (8 + math.Random().nextInt(5));
-        _elevation += math.Random().nextDouble() * 0.5;
       });
     });
   }
@@ -547,19 +525,19 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
   String _getWorkoutName() {
     switch (_workoutType) {
       case 'running':
-        return 'Бег';
+        return tr('Жүгіру', 'Бег');
       case 'walking':
-        return 'Ходьба';
+        return tr('Жүру', 'Ходьба');
       case 'cycling':
-        return 'Велосипед';
+        return tr('Велосипед', 'Велосипед');
       case 'hiit':
         return 'HIIT';
       case 'yoga':
-        return 'Йога';
+        return tr('Йога', 'Йога');
       case 'swimming':
-        return 'Плавание';
+        return tr('Жүзу', 'Плавание');
       default:
-        return 'Тренировка';
+        return tr('Жаттығу', 'Тренировка');
     }
   }
 
@@ -618,10 +596,10 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
                       child: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.05),
+                          color: Colors.white.withValues(alpha: 0.05),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: Colors.white.withOpacity(0.1),
+                            color: Colors.white.withValues(alpha: 0.1),
                             width: 1,
                           ),
                         ),
@@ -647,17 +625,17 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
                             margin: const EdgeInsets.only(top: 4),
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF10B981).withOpacity(0.2),
+                              color: const Color(0xFF10B981).withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: const Row(
+                            child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.circle, color: Color(0xFF10B981), size: 6),
-                                SizedBox(width: 4),
+                                const Icon(Icons.circle, color: Color(0xFF10B981), size: 6),
+                                const SizedBox(width: 4),
                                 Text(
-                                  'Запись',
-                                  style: TextStyle(
+                                  tr('Жазба', 'Запись'),
+                                  style: const TextStyle(
                                     fontSize: 11,
                                     color: Color(0xFF10B981),
                                     fontWeight: FontWeight.w600,
@@ -684,13 +662,13 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
                           color: _showDetailedStats
-                              ? const Color(0xFF00D9FF).withOpacity(0.2)
-                              : Colors.white.withOpacity(0.05),
+                              ? const Color(0xFF00D9FF).withValues(alpha: 0.2)
+                              : Colors.white.withValues(alpha: 0.05),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
                             color: _showDetailedStats
                                 ? const Color(0xFF00D9FF)
-                                : Colors.white.withOpacity(0.1),
+                                : Colors.white.withValues(alpha: 0.1),
                             width: 1,
                           ),
                         ),
@@ -730,8 +708,8 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
                                       shape: BoxShape.circle,
                                       gradient: RadialGradient(
                                         colors: [
-                                          const Color(0xFF00D9FF).withOpacity(0.0),
-                                          const Color(0xFF00D9FF).withOpacity(0.1 * (1 - _rippleController.value)),
+                                          const Color(0xFF00D9FF).withValues(alpha: 0.0),
+                                          const Color(0xFF00D9FF).withValues(alpha: 0.1 * (1 - _rippleController.value)),
                                         ],
                                       ),
                                     ),
@@ -745,19 +723,19 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
                                   begin: Alignment.topLeft,
                                   end: Alignment.bottomRight,
                                   colors: [
-                                    const Color(0xFF00D9FF).withOpacity(0.15),
-                                    const Color(0xFF4a90e2).withOpacity(0.1),
+                                    const Color(0xFF00D9FF).withValues(alpha: 0.15),
+                                    const Color(0xFF4a90e2).withValues(alpha: 0.1),
                                   ],
                                 ),
                                 borderRadius: BorderRadius.circular(24),
                                 border: Border.all(
-                                  color: const Color(0xFF00D9FF).withOpacity(0.3),
+                                  color: const Color(0xFF00D9FF).withValues(alpha: 0.3),
                                   width: 1.5,
                                 ),
                                 boxShadow: _isActive && !_isPaused
                                     ? [
                                   BoxShadow(
-                                    color: const Color(0xFF00D9FF).withOpacity(0.3),
+                                    color: const Color(0xFF00D9FF).withValues(alpha: 0.3),
                                     blurRadius: 30,
                                     spreadRadius: 5,
                                   ),
@@ -783,7 +761,7 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
                                             boxShadow: _isActive && !_isPaused
                                                 ? [
                                               BoxShadow(
-                                                color: const Color(0xFF00D9FF).withOpacity(0.6),
+                                                color: const Color(0xFF00D9FF).withValues(alpha: 0.6),
                                                 blurRadius: 25,
                                                 spreadRadius: 3,
                                               ),
@@ -816,9 +794,9 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
                                     decoration: BoxDecoration(
                                       color: _isActive
                                           ? (_isPaused
-                                          ? Colors.orange.withOpacity(0.2)
-                                          : const Color(0xFF10B981).withOpacity(0.2))
-                                          : Colors.white.withOpacity(0.1),
+                                          ? Colors.orange.withValues(alpha: 0.2)
+                                          : const Color(0xFF10B981).withValues(alpha: 0.2))
+                                          : Colors.white.withValues(alpha: 0.1),
                                       borderRadius: BorderRadius.circular(20),
                                       border: Border.all(
                                         color: _isActive
@@ -842,8 +820,8 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
                                         const SizedBox(width: 8),
                                         Text(
                                           _isActive
-                                              ? (_isPaused ? 'На паузе' : 'Активно')
-                                              : 'Готов к старту',
+                                              ? (_isPaused ? tr('Үзілісте', 'На паузе') : tr('Белсенді', 'Активно'))
+                                              : tr('Бастауға дайын', 'Готов к старту'),
                                           style: TextStyle(
                                             fontSize: 15,
                                             color: _isActive
@@ -868,8 +846,8 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
                           children: [
                             Expanded(
                               child: _buildMainMetricCard(
-                                'Дистанция',
-                                '${_distance.toStringAsFixed(2)}',
+                                tr('Қашықтық', 'Дистанция'),
+                                _distance.toStringAsFixed(2),
                                 'км',
                                 Icons.route_rounded,
                                 const Color(0xFF00D9FF),
@@ -878,8 +856,8 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
                             const SizedBox(width: 12),
                             Expanded(
                               child: _buildMainMetricCard(
-                                'Калории',
-                                '$_calories',
+                                tr('Калория', 'Калории'),
+                                _calories.toString(),
                                 'ккал',
                                 Icons.local_fire_department_rounded,
                                 const Color(0xFFEF4444),
@@ -890,48 +868,10 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
 
                         const SizedBox(height: 24),
 
-                        // График пульса
-                        if (_isActive && _heartRateHistory.length > 5) ...[
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text(
-                                'Пульс',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: _getHeartRateZoneColor().withOpacity(0.2),
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(
-                                    color: _getHeartRateZoneColor(),
-                                  ),
-                                ),
-                                child: Text(
-                                  _getHeartRateZone(),
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: _getHeartRateZoneColor(),
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          _buildHeartRateChart(),
-                          const SizedBox(height: 24),
-                        ],
-
                         // Статистика
-                        const Text(
-                          'Статистика',
-                          style: TextStyle(
+                        Text(
+                          tr('Статистика', 'Статистика'),
+                          style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w700,
                             color: Colors.white,
@@ -943,17 +883,17 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
                           children: [
                             Expanded(
                               child: _buildStatCard(
-                                'Пульс',
-                                _isActive ? '$_heartRate' : '--',
-                                'bpm',
-                                Icons.favorite_rounded,
-                                const Color(0xFFEC4899),
+                                tr('Қашықтық', 'Дистанция'),
+                                _isActive ? _distance.toStringAsFixed(2) : '--',
+                                'км',
+                                Icons.route_rounded,
+                                const Color(0xFF00D9FF),
                               ),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
                               child: _buildStatCard(
-                                'Темп',
+                                tr('Қарқын', 'Темп'),
                                 _isActive && _distance > 0
                                     ? '${(_seconds / 60 / _distance).toStringAsFixed(1)}'
                                     : '--',
@@ -971,9 +911,9 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
                           children: [
                             Expanded(
                               child: _buildStatCard(
-                                'Шаги',
-                                _isActive ? '$_steps' : '--',
-                                'шагов',
+                                tr('Қадамдар', 'Шаги'),
+                                _isActive ? _steps.toString() : '--',
+                                tr('қадам', 'шагов'),
                                 Icons.directions_walk_rounded,
                                 const Color(0xFF10B981),
                               ),
@@ -981,8 +921,8 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
                             const SizedBox(width: 12),
                             Expanded(
                               child: _buildStatCard(
-                                'Скорость',
-                                _isActive ? '${_avgSpeed.toStringAsFixed(1)}' : '--',
+                                tr('Жылдамдық', 'Скорость'),
+                                _isActive ? _avgSpeed.toStringAsFixed(1) : '--',
                                 'км/ч',
                                 Icons.flash_on_rounded,
                                 const Color(0xFFEAB308),
@@ -1002,7 +942,7 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
                                   children: [
                                     Expanded(
                                       child: _buildStatCard(
-                                        'Макс. скорость',
+                                        tr('Макс. жылдамдық', 'Макс. скорость'),
                                         _isActive ? '${_maxSpeed.toStringAsFixed(1)}' : '--',
                                         'км/ч',
                                         Icons.trending_up_rounded,
@@ -1012,8 +952,8 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
                                     const SizedBox(width: 12),
                                     Expanded(
                                       child: _buildStatCard(
-                                        'Набор высоты',
-                                        _isActive ? '${_elevation.toStringAsFixed(0)}' : '--',
+                                        tr('Биіктік өсімі', 'Набор высоты'),
+                                        _isActive ? _elevation.toStringAsFixed(0) : '--',
                                         'м',
                                         Icons.terrain_rounded,
                                         const Color(0xFF8B5CF6),
@@ -1026,17 +966,17 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
                                   children: [
                                     Expanded(
                                       child: _buildStatCard(
-                                        'Макс. пульс',
-                                        _isActive && _maxHeartRate > 0 ? '$_maxHeartRate' : '--',
-                                        'bpm',
-                                        Icons.show_chart_rounded,
-                                        const Color(0xFFDB2777),
+                                        tr('Калория', 'Калории'),
+                                        _isActive ? _calories.toString() : '--',
+                                        'ккал',
+                                        Icons.local_fire_department_rounded,
+                                        const Color(0xFFEF4444),
                                       ),
                                     ),
                                     const SizedBox(width: 12),
                                     Expanded(
                                       child: _buildStatCard(
-                                        'Кругов',
+                                        tr('Айналымдар', 'Кругов'),
                                         '${_splitTimes.length}',
                                         '',
                                         Icons.replay_rounded,
@@ -1065,7 +1005,7 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      const Color(0xFF0d111d).withOpacity(0.0),
+                      const Color(0xFF0d111d).withValues(alpha: 0.0),
                       const Color(0xFF0d111d),
                     ],
                   ),
@@ -1080,20 +1020,20 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
                           child: Container(
                             padding: const EdgeInsets.symmetric(vertical: 14),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.05),
+                              color: Colors.white.withValues(alpha: 0.05),
                               borderRadius: BorderRadius.circular(14),
                               border: Border.all(
-                                color: const Color(0xFF00D9FF).withOpacity(0.3),
+                                color: const Color(0xFF00D9FF).withValues(alpha: 0.3),
                               ),
                             ),
-                            child: const Row(
+                            child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(Icons.flag_rounded, color: Color(0xFF00D9FF), size: 20),
-                                SizedBox(width: 8),
+                                const Icon(Icons.flag_rounded, color: Color(0xFF00D9FF), size: 20),
+                                const SizedBox(width: 8),
                                 Text(
-                                  'Отметить круг',
-                                  style: TextStyle(
+                                  tr('Айналым белгілеу', 'Отметить круг'),
+                                  style: const TextStyle(
                                     fontSize: 15,
                                     fontWeight: FontWeight.w600,
                                     color: Color(0xFF00D9FF),
@@ -1113,22 +1053,22 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
                               child: Container(
                                 padding: const EdgeInsets.symmetric(vertical: 18),
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.05),
+                                  color: Colors.white.withValues(alpha: 0.05),
                                   borderRadius: BorderRadius.circular(16),
                                   border: Border.all(
-                                    color: const Color(0xFFEF4444).withOpacity(0.5),
+                                    color: const Color(0xFFEF4444).withValues(alpha: 0.5),
                                     width: 2,
                                   ),
                                 ),
-                                child: const Center(
+                                child: Center(
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Icon(Icons.stop_rounded, color: Color(0xFFEF4444), size: 24),
-                                      SizedBox(width: 8),
+                                      const Icon(Icons.stop_rounded, color: Color(0xFFEF4444), size: 24),
+                                      const SizedBox(width: 8),
                                       Text(
-                                        'Завершить',
-                                        style: TextStyle(
+                                        tr('Аяқтау', 'Завершить'),
+                                        style: const TextStyle(
                                           fontSize: 17,
                                           fontWeight: FontWeight.w700,
                                           color: Color(0xFFEF4444),
@@ -1159,7 +1099,7 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
                                   BoxShadow(
                                     color: (_isActive && !_isPaused
                                         ? const Color(0xFFF97316)
-                                        : const Color(0xFF00D9FF)).withOpacity(0.5),
+                                        : const Color(0xFF00D9FF)).withValues(alpha: 0.5),
                                     blurRadius: 25,
                                     offset: const Offset(0, 10),
                                   ),
@@ -1179,8 +1119,8 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
                                     const SizedBox(width: 8),
                                     Text(
                                       !_isActive
-                                          ? 'Старт'
-                                          : (_isPaused ? 'Продолжить' : 'Пауза'),
+                                          ? tr('Бастау', 'Старт')
+                                          : (_isPaused ? tr('Жалғастыру', 'Продолжить') : tr('Үзіліс', 'Пауза')),
                                       style: const TextStyle(
                                         fontSize: 18,
                                         fontWeight: FontWeight.w800,
@@ -1211,45 +1151,29 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF1a1f3a),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text(
-          'Завершить тренировку?',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+        title: Text(
+          tr('Жаттығуды аяқтайсыз ба?', 'Завершить тренировку?'),
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
         ),
-        content: const Text(
-          'Вы уверены, что хотите выйти? Все данные будут потеряны.',
-          style: TextStyle(color: Colors.white70),
+        content: Text(
+          tr('Шығуға сенімдісіз бе? Барлық деректер жоғалады.', 'Вы уверены, что хотите выйти? Все данные будут потеряны.'),
+          style: const TextStyle(color: Colors.white70),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Отмена', style: TextStyle(color: Colors.white70)),
+            child: Text(tr('Бас тарту', 'Отмена'), style: const TextStyle(color: Colors.white70)),
           ),
           TextButton(
             onPressed: () {
               Navigator.pop(context);
               Navigator.pop(context);
             },
-            child: const Text('Выйти', style: TextStyle(color: Color(0xFFEF4444))),
+            child: Text(tr('Шығу', 'Выйти'), style: const TextStyle(color: Color(0xFFEF4444))),
           ),
         ],
       ),
     );
-  }
-
-  String _getHeartRateZone() {
-    if (_heartRate < 100) return 'Зона отдыха';
-    if (_heartRate < 120) return 'Легкая зона';
-    if (_heartRate < 140) return 'Жиросжигание';
-    if (_heartRate < 160) return 'Аэробная';
-    return 'Анаэробная';
-  }
-
-  Color _getHeartRateZoneColor() {
-    if (_heartRate < 100) return const Color(0xFF10B981);
-    if (_heartRate < 120) return const Color(0xFF00D9FF);
-    if (_heartRate < 140) return const Color(0xFFEAB308);
-    if (_heartRate < 160) return const Color(0xFFF97316);
-    return const Color(0xFFEF4444);
   }
 
   Widget _buildMainMetricCard(String label, String value, String unit, IconData icon, Color color) {
@@ -1260,13 +1184,13 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            color.withOpacity(0.15),
-            color.withOpacity(0.05),
+            color.withValues(alpha: 0.15),
+            color.withValues(alpha: 0.05),
           ],
         ),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: color.withOpacity(0.3),
+          color: color.withValues(alpha: 0.3),
           width: 1.5,
         ),
       ),
@@ -1278,7 +1202,7 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.2),
+                  color: color.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(icon, color: color, size: 20),
@@ -1312,7 +1236,7 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
-                    color: Colors.white.withOpacity(0.6),
+                    color: Colors.white.withValues(alpha: 0.6),
                   ),
                 ),
               ],
@@ -1327,10 +1251,10 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
+        color: Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: Colors.white.withOpacity(0.1),
+          color: Colors.white.withValues(alpha: 0.1),
           width: 1,
         ),
       ),
@@ -1384,161 +1308,4 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
     );
   }
 
-  Widget _buildHeartRateChart() {
-    return Container(
-      height: 130,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            const Color(0xFFEC4899).withOpacity(0.1),
-            const Color(0xFFEC4899).withOpacity(0.05),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: const Color(0xFFEC4899).withOpacity(0.3),
-          width: 1.5,
-        ),
-      ),
-      child: Row(
-        children: [
-          Column(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEC4899).withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(Icons.favorite_rounded, color: Color(0xFFEC4899), size: 20),
-              ),
-              Text(
-                '$_heartRate',
-                style: const TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w900,
-                  color: Color(0xFFEC4899),
-                  letterSpacing: -1,
-                ),
-              ),
-              const Text(
-                'bpm',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: Colors.white54,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(width: 18),
-          Expanded(
-            child: CustomPaint(
-              size: Size.infinite,
-              painter: HeartRateChartPainter(_heartRateHistory),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class HeartRateChartPainter extends CustomPainter {
-  final List<int> data;
-
-  HeartRateChartPainter(this.data);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (data.length < 2) return;
-
-    final paint = Paint()
-      ..color = const Color(0xFFEC4899)
-      ..strokeWidth = 3.0
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-
-    final path = Path();
-    final maxValue = data.reduce(math.max).toDouble();
-    final minValue = data.reduce(math.min).toDouble();
-    final range = maxValue - minValue;
-
-    for (int i = 0; i < data.length; i++) {
-      final x = (i / (data.length - 1)) * size.width;
-      final normalizedValue = range > 0 ? (data[i] - minValue) / range : 0.5;
-      final y = size.height - (normalizedValue * size.height * 0.9) - (size.height * 0.05);
-
-      if (i == 0) {
-        path.moveTo(x, y);
-      } else {
-        final prevX = ((i - 1) / (data.length - 1)) * size.width;
-        final prevNormalizedValue = range > 0 ? (data[i - 1] - minValue) / range : 0.5;
-        final prevY = size.height - (prevNormalizedValue * size.height * 0.9) - (size.height * 0.05);
-
-        final controlX1 = prevX + (x - prevX) / 3;
-        final controlY1 = prevY;
-        final controlX2 = prevX + 2 * (x - prevX) / 3;
-        final controlY2 = y;
-
-        path.cubicTo(controlX1, controlY1, controlX2, controlY2, x, y);
-      }
-    }
-
-    canvas.drawPath(path, paint);
-
-    // Заливка под графиком
-    final fillPath = Path.from(path);
-    fillPath.lineTo(size.width, size.height);
-    fillPath.lineTo(0, size.height);
-    fillPath.close();
-
-    final gradient = LinearGradient(
-      begin: Alignment.topCenter,
-      end: Alignment.bottomCenter,
-      colors: [
-        const Color(0xFFEC4899).withOpacity(0.4),
-        const Color(0xFFEC4899).withOpacity(0.0),
-      ],
-    );
-
-    final fillPaint = Paint()
-      ..shader = gradient.createShader(Rect.fromLTWH(0, 0, size.width, size.height))
-      ..style = PaintingStyle.fill;
-
-    canvas.drawPath(fillPath, fillPaint);
-
-    // Точки на графике
-    for (int i = 0; i < data.length; i++) {
-      if (i % 5 == 0 || i == data.length - 1) {
-        final x = (i / (data.length - 1)) * size.width;
-        final normalizedValue = range > 0 ? (data[i] - minValue) / range : 0.5;
-        final y = size.height - (normalizedValue * size.height * 0.9) - (size.height * 0.05);
-
-        canvas.drawCircle(
-          Offset(x, y),
-          4,
-          Paint()
-            ..color = const Color(0xFFEC4899)
-            ..style = PaintingStyle.fill,
-        );
-
-        canvas.drawCircle(
-          Offset(x, y),
-          6,
-          Paint()
-            ..color = const Color(0xFFEC4899).withOpacity(0.3)
-            ..style = PaintingStyle.fill,
-        );
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(HeartRateChartPainter oldDelegate) => true;
 }
