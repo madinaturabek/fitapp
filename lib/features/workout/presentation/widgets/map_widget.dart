@@ -28,8 +28,8 @@ class MapWidget extends StatelessWidget {
 
     // Центр карты:
     // - если есть точки: последняя
-    // - иначе: запасной центр (Москва)
-    final center = points.isNotEmpty ? points.last : const LatLng(55.751244, 37.618423);
+    // - иначе: запасной центр (Астана)
+    final center = points.isNotEmpty ? points.last : const LatLng(51.09062369412649, 71.41771064008319);
     final markerPoint = currentPoint == null
         ? null
         : LatLng(currentPoint!.latitude, currentPoint!.longitude);
