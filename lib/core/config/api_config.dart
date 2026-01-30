@@ -2,10 +2,7 @@ import 'package:flutter/foundation.dart';
 
 class ApiConfig {
   static String get baseUrl {
-    if (kIsWeb) return 'http://localhost:3000';
-    if (defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://10.0.2.2:3000';
-    }
-    return 'http://localhost:3000';
+    const remote = 'https://fitapp-production-f671.up.railway.app:8080';
+    return remote;
   }
 }
