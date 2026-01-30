@@ -22,7 +22,7 @@ class TrackingPage extends StatefulWidget {
   State<TrackingPage> createState() => _TrackingPageState();
 }
 
-class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMixin {
+class _TrackingPageState extends State<TrackingPage> {
   bool _isActive = false;
   bool _isPaused = false;
   int _seconds = 0;
@@ -34,12 +34,15 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
   int _calories = 0;
   int _steps = 0;
   double _avgSpeed = 0.0;
+  double _currentSpeed = 0.0;
   double _pace = 0.0;
   double _elevation = 0.0;
 
   String _workoutType = 'running';
 
   final List<double> _speedHistory = [];
+  final List<RoutePoint> _recentPoints = [];
+  DateTime? _lastMovementAt;
   final List<double> _elevationHistory = [];
 
   final List<RoutePoint> _route = [];
@@ -47,21 +50,10 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
   int _startSteps = 0;
   bool _hasStepBaseline = false;
 
-  late AnimationController _pulseController;
-  late AnimationController _rippleController;
 
   @override
   void initState() {
     super.initState();
-    _pulseController = AnimationController(
-      duration: const Duration(milliseconds: 1000),
-      vsync: this,
-    )..repeat(reverse: true);
-
-    _rippleController = AnimationController(
-      duration: const Duration(milliseconds: 1500),
-      vsync: this,
-    )..repeat();
   }
 
   @override
@@ -78,8 +70,6 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
     _timer?.cancel();
     _positionSub?.cancel();
     _stepSub?.cancel();
-    _pulseController.dispose();
-    _rippleController.dispose();
     super.dispose();
   }
 
@@ -226,6 +216,37 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
       );
     }
 
+    final now = DateTime.now();
+    _recentPoints.add(point);
+    _recentPoints.removeWhere(
+      (p) => now.difference(p.timestamp).inSeconds > 10,
+    );
+
+    double liveSpeed = 0.0;
+    if (_recentPoints.length >= 2) {
+      final first = _recentPoints.first;
+      final last = _recentPoints.last;
+      final durationSec = now.difference(first.timestamp).inMilliseconds / 1000.0;
+      if (durationSec > 0) {
+        final meters = Geolocator.distanceBetween(
+          first.latitude,
+          first.longitude,
+          last.latitude,
+          last.longitude,
+        );
+        liveSpeed = (meters / durationSec) * 3.6;
+      }
+    }
+
+    if (deltaMeters > 1.0) {
+      _lastMovementAt = now;
+    }
+    if (_lastMovementAt == null ||
+        now.difference(_lastMovementAt!).inSeconds >= 3 ||
+        deltaMeters < 0.3) {
+      liveSpeed = 0.0;
+    }
+
     setState(() {
       _route.add(point);
       if (deltaMeters > 0.5) {
@@ -239,7 +260,8 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
         _pace = (_seconds / 60) / _distance;
       }
 
-      _speedHistory.add(_avgSpeed);
+      _currentSpeed = liveSpeed.clamp(0, 25);
+      _speedHistory.add(_currentSpeed);
       _elevationHistory.add(_elevation);
       if (_speedHistory.length > 30) _speedHistory.removeAt(0);
       if (_elevationHistory.length > 30) _elevationHistory.removeAt(0);
@@ -358,12 +380,15 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
       _calories = 0;
       _steps = 0;
       _avgSpeed = 0.0;
+      _currentSpeed = 0.0;
       _pace = 0.0;
       _elevation = 0.0;
       _speedHistory.clear();
       _elevationHistory.clear();
       _route.clear();
       _lastPosition = null;
+      _recentPoints.clear();
+      _lastMovementAt = null;
       _hasStepBaseline = false;
       _startSteps = 0;
     });
@@ -803,89 +828,58 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
                   children: [
                     const SizedBox(height: 8),
 
-                    Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        if (_isActive && !_isPaused)
-                          AnimatedBuilder(
-                            animation: _rippleController,
-                            builder: (context, child) {
-                              return Container(
-                                width: 200 + (_rippleController.value * 40),
-                                height: 200 + (_rippleController.value * 40),
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: const Color(0xFF00D9FF).withOpacity(0.3 - (_rippleController.value * 0.3)),
-                                    width: 2,
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-
-                        Container(
-                          width: 200,
-                          height: 200,
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [
-                                const Color(0xFF00D9FF).withOpacity(0.2),
-                                const Color(0xFF0EA5E9).withOpacity(0.1),
-                              ],
-                            ),
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: const Color(0xFF00D9FF).withOpacity(0.3),
-                              width: 2,
-                            ),
-                          ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              AnimatedBuilder(
-                                animation: _pulseController,
-                                builder: (context, child) {
-                                  return Transform.scale(
-                                    scale: _isActive && !_isPaused ? 1.0 + (_pulseController.value * 0.1) : 1.0,
-                                    child: Icon(
-                                      _getWorkoutIcon(),
-                                      color: const Color(0xFF00D9FF),
-                                      size: 40,
-                                    ),
-                                  );
-                                },
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                _formatTime(_seconds),
-                                style: const TextStyle(
-                                  fontSize: 36,
-                                  fontWeight: FontWeight.w900,
-                                  color: Colors.white,
-                                  letterSpacing: -1.5,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                _isActive
-                                    ? (_isPaused ? tr('ҮЗІЛІС', 'ПАУЗА') : tr('БЕЛСЕНДІ', 'АКТИВНО'))
-                                    : tr('ДАЙЫН', 'ГОТОВ'),
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  color: _isActive
-                                      ? (_isPaused ? Colors.orange : const Color(0xFF10B981))
-                                      : Colors.white38,
-                                  letterSpacing: 2,
-                                ),
-                              ),
-                            ],
-                          ),
+                    Container(
+                      width: 200,
+                      height: 200,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            const Color(0xFF00D9FF).withOpacity(0.2),
+                            const Color(0xFF0EA5E9).withOpacity(0.1),
+                          ],
                         ),
-                      ],
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: const Color(0xFF00D9FF).withOpacity(0.3),
+                          width: 2,
+                        ),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            _getWorkoutIcon(),
+                            color: const Color(0xFF00D9FF),
+                            size: 40,
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            _formatTime(_seconds),
+                            style: const TextStyle(
+                              fontSize: 36,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                              letterSpacing: -1.5,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _isActive
+                                ? (_isPaused ? tr('ҮЗІЛІС', 'ПАУЗА') : tr('БЕЛСЕНДІ', 'АКТИВНО'))
+                                : tr('ДАЙЫН', 'ГОТОВ'),
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: _isActive
+                                  ? (_isPaused ? Colors.orange : const Color(0xFF10B981))
+                                  : Colors.white38,
+                              letterSpacing: 2,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
 
                     const SizedBox(height: 32),
@@ -920,7 +914,7 @@ class _TrackingPageState extends State<TrackingPage> with TickerProviderStateMix
                       children: [
                         Expanded(
                           child: _buildLiveMetricCard(
-                            _isActive ? '${_avgSpeed.toStringAsFixed(1)}' : '--',
+                            _isActive ? '${_currentSpeed.toStringAsFixed(1)}' : '--',
                             'км/ч',
                             tr('Жылдамдық', 'Скорость'),
                             Icons.speed_rounded,
